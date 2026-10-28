@@ -72,6 +72,9 @@ input,textarea{font:inherit;color:var(--ink);background:var(--bg1);border:1px so
 footer{position:relative;z-index:1;text-align:center;padding:8px 16px 40px;font:700 26px "Mountains of Christmas",Georgia,serif;color:var(--red);animation:float 3.5s ease-in-out infinite}
 @media (max-width:520px){.two,.three{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+.sortbar{text-align:center;margin:-8px 0 22px}
+.sortbar select{width:auto;padding:10px 16px;border-radius:99px;font-weight:700;background:linear-gradient(135deg,var(--green),#0f5c35);color:#fff;border:0;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.sortbar select option{color:#1e293b;background:#fff}
 </style>
 </head>
 <body>
@@ -102,7 +105,7 @@ footer{position:relative;z-index:1;text-align:center;padding:8px 16px 40px;font:
 (function(){
 var state=JSON.parse(document.getElementById('data').textContent);
 var app=document.getElementById('app');
-var canEdit=false,editIdx=-1,msg='',cat='',out='';
+var canEdit=false,editIdx=-1,msg='',cat='',sort='',out='';
 if(canEdit){try{var d=localStorage.getItem('liste-noel-draft');if(d)state=JSON.parse(d);}catch(e){}}
 function persist(){try{localStorage.setItem('liste-noel-draft',JSON.stringify(state));}catch(e){}}
 function h(tag,props,kids){var e=document.createElement(tag);
@@ -116,6 +119,7 @@ function label(c){return (c||'').replace(/^[^\p{L}\p{N}]+/u,'').trim();}
 function exportJson(){var o=JSON.parse(JSON.stringify(state));var it=o.items;delete o.items;
   return (JSON.stringify(o).slice(0,-1)+',"items":[\n'+it.map(function(i){return JSON.stringify(i);}).join(',\n')+'\n]}').replace(/</g,'\\u003c');}
 
+function pnum(p){var m=String(p||'').replace(/\s/g,'').replace(',','.').match(/\d+(\.\d+)?/);return m?parseFloat(m[0]):null;}
 function render(){
   app.innerHTML='';
   if(canEdit)app.appendChild(h('p',{class:'hint',text:'✏️ Mode édition : toi seul vois ça. Les modifications sont gardées dans ce navigateur ; pour les publier, copie les données et colle-les dans index.html sur GitHub.'}));
@@ -142,8 +146,15 @@ function render(){
     app.appendChild(p);
   }
 
+  if(state.items.length>1){
+    var sel=h('select',{onchange:function(e){sort=e.target.value;render();}},[['','Trier : ordre de la liste'],['asc','Prix croissant ↑'],['desc','Prix décroissant ↓']].map(function(o){return h('option',{value:o[0],text:o[1]});}));
+    sel.value=sort;app.appendChild(h('div',{class:'sortbar'},[sel]));
+  }
   var grid=h('div',{class:'grid'},[]),shown=0;
-  state.items.forEach(function(it,i){
+  var order=state.items.map(function(x,i){return i;});
+  if(sort)order.sort(function(a,b){var x=pnum(state.items[a].price),y=pnum(state.items[b].price);if(x===null&&y===null)return a-b;if(x===null)return 1;if(y===null)return -1;return (sort==='asc'?x-y:y-x)||a-b;});
+  order.forEach(function(i){
+    var it=state.items[i];
     if(cat&&it.cat!==cat)return;
     shown++;
     var link=safeUrl(it.url),qn=it.qty||1,off=it.offered||0,full=off>=qn;
